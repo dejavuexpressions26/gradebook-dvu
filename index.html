@@ -279,17 +279,10 @@ const FB_CONFIGURED = !FIREBASE_CONFIG.apiKey.startsWith('TU_');
 
 let db = null;
 if (FB_CONFIGURED) {
-  firebase.initializeApp(FIREBASE_CONFIG);
-  db = firebase.database();
-} else {
-  // Mostrar aviso de configuración
-  document.getElementById('config-notice-wrap').innerHTML = `
-    <div class="config-notice" style="margin-top:16px">
-      <strong>⚙️ Configuración pendiente</strong>
-      Abre este archivo en un editor de texto y reemplaza los valores de
-      <code>FIREBASE_CONFIG</code> con los de tu proyecto Firebase.
-      Mientras tanto, los datos se guardan localmente en este dispositivo.
-    </div>`;
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.database();
+  } catch(e) { console.warn('Firebase error:', e); }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -380,7 +373,17 @@ function showGroups() {
   document.getElementById('view-gradebook').classList.remove('active');
   document.getElementById('back-btn').classList.remove('visible');
   document.getElementById('header-title').textContent = 'Gradebook';
-  loadAllGroups(renderGroups);
+  // Mostrar aviso si Firebase no está configurado (DOM ya existe aquí)
+if (!FB_CONFIGURED) {
+  const wrap = document.getElementById('config-notice-wrap');
+  if (wrap) wrap.innerHTML = `
+    <div class="config-notice" style="margin-top:16px">
+      <strong>⚙️ Funciona en modo local</strong>
+      Los datos se guardan en este dispositivo. Para sincronizar en la nube,
+      configura Firebase en el archivo <code>index.html</code>.
+    </div>`;
+}
+loadAllGroups(renderGroups);
 }
 
 function renderGroups() {
@@ -662,6 +665,8 @@ function toast(msg){
 // ══════════════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════════════
+// Mostrar aviso si Firebase no está configurado (DOM ya existe aquí)
+
 loadAllGroups(renderGroups);
 </script>
 </body>
