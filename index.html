@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gradebook — Deja-vu Expressions</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --cream: #FAF7F2; --ink: #1A1208; --blue: #4A7596; 
+            --line: #D9D3CA; --white: #FFFFFF; --r: 4px;
+        }
+        body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); margin: 0; padding-bottom: 50px; font-size: 14px; }
+        header { background: var(--ink); color: var(--cream); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; }
+        .view { display: none; padding: 20px; max-width: 900px; margin: 0 auto; }
+        .view.active { display: block; }
+        .btn { padding: 6px 12px; border-radius: var(--r); border: none; cursor: pointer; font-size: 13px; font-weight: 500; }
+        .btn-blue { background: var(--blue); color: white; }
+        .student-row { background: var(--white); border: 1px solid var(--line); border-radius: var(--r); padding: 8px 12px; margin-bottom: 6px; display: flex; align-items: center; gap: 15px; }
+        .student-name { font-weight: 600; width: 150px; border: none; outline: none; }
+        .sessions-container { display: flex; gap: 15px; }
+        .session-group { display: flex; gap: 4px; align-items: center; }
+        .task-input { width: 30px; padding: 4px; border: 1px solid var(--line); border-radius: 2px; text-align: center; font-family: 'DM Mono', monospace; font-size: 12px; }
+        .avg-badge { font-weight: bold; width: 30px; text-align: center; color: var(--blue); }
+        #toast { position: fixed; bottom: 20px; right: 20px; background: var(--ink); color: white; padding: 8px 16px; border-radius: var(--r); opacity: 0; pointer-events: none; transition: 0.3s; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div><strong>Gradebook</strong></div>
+    <button class="btn btn-blue" id="back-btn" style="display:none" onclick="showGroups()">← Volver</button>
+</header>
+
+<div id="view-groups" class="view active">
+    <h3>Grupos</h3>
+    <div id="groups-list"></div>
+    <button class="btn btn-blue" onclick="openGroupModal()">＋ Nuevo Grupo</button>
+</div>
+
+<div id="view-gradebook" class="view">
+    <h3 id="gb-title"></h3>
+    <div id="students-list"></div>
+    <button class="btn btn-blue" onclick="addStudent()">＋ Agregar Alumna</button>
+</div>
+
+<div id="toast">Guardado</div>
+
+<script>
+    const TASKS = [{code:'M',name:'M'},{code:'A',name:'A'},{code:'B',name:'B'},{code:'N',name:'N'}];
+    let groups = JSON.parse(localStorage.getItem('dvu-groups')||'{}');
+    let currentId = null;
+
+    function save() { localStorage.setItem('dvu-groups', JSON.stringify(groups)); }
+    function toast(m) { const t=document.getElementById('toast'); t.textContent=m; t.style.opacity=1; setTimeout(()=>t.style.opacity=0, 2000); }
+
+    function renderStudents() {
+        const g = groups[currentId];
+        const sessions = ['C1', 'C2', 'C3', 'C4'];
+        document.getElementById('students-list').innerHTML = (g.students||[]).map((st, si) => `
+            <div class="student-row">
+                <input class="student-name" value="${st.name}" onchange="groups[currentId].students[${si}].name=this.value;save()">
+                <div class="sessions-container">
+                    ${sessions.map(s => `
+                        <div class="session-group">
+                            ${TASKS.map(t => `<input type="number" class="task-input" placeholder="-" value="${st.tasks?.[s]?.[t.code] || ''}" onchange="updateTask(${si}, '${s}', '${t.code}', this.value)">`).join('')}
+                        </div>
+                    `).join(' | ')}
+                </div>
+                <div class="avg-badge" id="avg-${si}">${calcAvg(st)}</div>
+            </div>
+        `).join('');
+    }
+
+    function updateTask(si, ses, code, val) {
+        const st = groups[currentId].students[si];
+        if(!st.tasks) st.tasks = {};
+        if(!st.tasks[ses]) st.tasks[ses] = {};
+        st.tasks[ses][code] = val;
+        document.getElementById(`avg-${si}`).textContent = calcAvg(st);
+        save();
+        toast('Guardado');
+    }
+
+    function calcAvg(st) {
+        let sum = 0, count = 0;
+        if(st.tasks) {
+            Object.values(st.tasks).forEach(ses => {
+                Object.values(ses).forEach(v => {
+                    const n = parseInt(v);
+                    if(!isNaN(n)) { sum += n; count++; }
+                });
+            });
+        }
+        return count ? Math.round(sum/count) : '—';
+    }
+
+    // Funciones básicas de navegación omitidas para brevedad, igual que en tu código original
+    function openGroup(id) { currentId = id; document.getElementById('view-groups').classList.remove('active'); document.getElementById('view-gradebook').classList.add('active'); document.getElementById('back-btn').style.display = 'block'; document.getElementById('gb-title').textContent = groups[id].name; renderStudents(); }
+    function showGroups() { document.getElementById('view-groups').classList.add('active'); document.getElementById('view-gradebook').classList.remove('active'); document.getElementById('back-btn').style.display = 'none'; renderGroups(); }
+    function renderGroups() { document.getElementById('groups-list').innerHTML = Object.keys(groups).map(id => `<div style="padding:10px; border-bottom:1px solid #eee; cursor:pointer" onclick="openGroup('${id}')">${groups[id].name}</div>`).join(''); }
+    function addStudent() { groups[currentId].students.push({name: 'Nueva Alumna', tasks: {}}); save(); renderStudents(); }
+    function openGroupModal() { const name = prompt("Nombre del grupo:"); if(name) { const id = 'g'+Date.now(); groups[id] = {name, students: []}; save(); renderGroups(); } }
+    renderGroups();
+</script>
+</body>
+</html>
