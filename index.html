@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gradebook — Deja-vu Expressions</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<style>
+:root{
+  --cream:#FAF7F2;--ink:#1A1208;--rose:#C8637A;--rose-lt:#F5D9DF;
+  --gold:#C49A3C;--gold-lt:#F7EDD5;--sage:#5C7A62;--sage-lt:#DCE9DE;
+  --mist:#EAE6E0;--line:#D9D3CA;--white:#FFFFFF;
+  --r:6px;--mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--cream);color:var(--ink);min-height:100vh}
+
+/* ── Header ── */
+header{background:var(--ink);color:var(--cream);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:2px}
+header h1{font-size:17px;font-weight:600;letter-spacing:-.02em}
+.back-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:var(--cream);font-family:var(--sans);font-size:12px;font-weight:500;padding:6px 14px;border-radius:var(--r);cursor:pointer;display:none;gap:6px;align-items:center}
+.back-btn:hover{background:rgba(255,255,255,.18)}
+.back-btn.visible{display:flex}
+
+/* ── Buttons ── */
+.btn{font-family:var(--sans);font-size:12px;font-weight:500;padding:7px 14px;border-radius:var(--r);border:none;cursor:pointer;transition:opacity .15s;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{opacity:.85}
+.btn-rose{background:var(--rose);color:#fff}
+.btn-gold{background:var(--gold);color:#fff}
+.btn-sage{background:var(--sage);color:#fff}
+.btn-mist{background:var(--mist);color:var(--ink)}
+.btn-sm{font-size:11px;padding:5px 11px}
+.btn-xs{font-size:10px;padding:3px 8px;border-radius:4px}
+.btn-danger{background:var(--rose-lt);color:var(--rose);border:none}
+.icon-btn{background:none;border:none;cursor:pointer;padding:3px 6px;border-radius:4px;color:#bbb;font-size:14px;transition:color .15s,background .15s}
+.icon-btn:hover{color:var(--rose);background:var(--rose-lt)}
+
+/* ── Views ── */
+.view{display:none;padding:24px}
+.view.active{display:block}
+
+/* ── VISTA: Grupos ── */
+.groups-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:20px}
+.group-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:18px;cursor:pointer;transition:border-color .15s,box-shadow .15s;position:relative}
+.group-card:hover{border-color:var(--rose);box-shadow:0 2px 12px rgba(200,99,122,.12)}
+.group-type-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:20px;margin-bottom:10px}
+.badge-makeup{background:var(--rose-lt);color:var(--rose)}
+.badge-hair{background:var(--gold-lt);color:var(--gold)}
+.badge-other{background:var(--sage-lt);color:var(--sage)}
+.group-card h3{font-size:16px;font-weight:600;margin-bottom:4px;padding-right:24px}
+.group-meta{font-size:12px;color:#888;display:flex;flex-direction:column;gap:2px;margin-top:6px}
+.group-stats{display:flex;gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid var(--mist)}
+.stat{font-size:11px;color:#aaa;display:flex;flex-direction:column;gap:1px}
+.stat strong{font-size:18px;font-family:var(--mono);color:var(--ink)}
+.card-del{position:absolute;top:14px;right:14px;background:none;border:none;cursor:pointer;color:#ccc;font-size:16px;padding:2px 5px;border-radius:4px;transition:color .15s,background .15s}
+.card-del:hover{color:var(--rose);background:var(--rose-lt)}
+
+/* Empty state */
+.empty-state{text-align:center;padding:60px 20px;color:#bbb}
+.empty-state p{font-size:14px;margin-top:8px}
+
+/* ── Modal ── */
+.modal-bg{position:fixed;inset:0;background:rgba(26,18,8,.45);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-bg.open{display:flex}
+.modal{background:var(--white);border-radius:10px;padding:24px;width:100%;max-width:480px;box-shadow:0 8px 40px rgba(0,0,0,.18);max-height:90vh;overflow-y:auto}
+.modal h2{font-size:17px;font-weight:600;margin-bottom:16px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--rose);margin-bottom:4px}
+.field input,.field select,.field textarea{width:100%;font-family:var(--sans);font-size:13px;padding:7px 10px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--cream);color:var(--ink);outline:none}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--rose)}
+.field textarea{resize:vertical;min-height:60px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+
+/* ── INFO del grupo (inline editable) ── */
+.group-info-panel{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin-bottom:24px}
+.group-info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:12px}
+.info-field{display:flex;flex-direction:column;gap:3px}
+.info-field label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--gold)}
+.info-field input,.info-field select{font-family:var(--sans);font-size:13px;padding:6px 8px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--cream);color:var(--ink);outline:none;width:100%}
+.info-field input:focus,.info-field select:focus{border-color:var(--gold)}
+.info-field textarea{font-family:var(--sans);font-size:12px;padding:6px 8px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--cream);color:var(--ink);outline:none;width:100%;resize:vertical;min-height:52px}
+.info-field textarea:focus{border-color:var(--gold)}
+.info-obs{grid-column:1/-1}
+
+/* ── Section title ── */
+.section-title{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:10px;display:flex;align-items:center;gap:10px}
+.section-title::after{content:'';flex:1;height:1px;background:var(--line)}
+
+/* ── Alumnas (lista compacta con promedio) ── */
+.students-summary{background:var(--white);border:1px solid var(--line);border-radius:var(--r);margin-bottom:24px;overflow:hidden}
+.stu-summary-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--mist)}
+.stu-summary-row:last-child{border-bottom:none}
+.stu-num{font-family:var(--mono);font-size:10px;color:#bbb;min-width:18px}
+.stu-name-inp{font-family:var(--sans);font-size:13px;font-weight:600;border:none;background:transparent;color:var(--ink);outline:none;flex:1;min-width:100px}
+.stu-name-inp:focus{border-bottom:1.5px solid var(--rose)}
+.stu-avg-chip{font-family:var(--mono);font-size:12px;font-weight:500;background:var(--mist);padding:2px 8px;border-radius:20px;white-space:nowrap;min-width:52px;text-align:center}
+.add-stu-btn{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:var(--white);border:1.5px dashed var(--line);border-radius:var(--r);color:#bbb;font-family:var(--sans);font-size:13px;cursor:pointer;transition:border-color .15s,color .15s;margin-bottom:24px}
+.add-stu-btn:hover{border-color:var(--rose);color:var(--rose)}
+
+/* ── Acordeón de sesiones ── */
+.sessions-list{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}
+.session-block{background:var(--white);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+
+/* Cabeza de sesión */
+.session-hd{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;user-select:none;background:var(--white);transition:background .1s}
+.session-hd:hover{background:var(--cream)}
+.session-toggle{font-size:11px;color:#bbb;transition:transform .2s;flex-shrink:0}
+.session-block.open .session-toggle{transform:rotate(90deg)}
+.session-hd-main{flex:1;display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0}
+.session-num{font-family:var(--mono);font-size:10px;font-weight:500;background:var(--ink);color:var(--cream);padding:2px 6px;border-radius:3px;flex-shrink:0}
+.session-name-inp{font-family:var(--sans);font-size:13px;font-weight:600;border:none;background:transparent;color:var(--ink);outline:none;min-width:80px;max-width:180px}
+.session-name-inp:focus{border-bottom:1.5px solid var(--rose)}
+.session-date-inp{font-family:var(--mono);font-size:11px;color:#888;border:none;background:transparent;outline:none;width:110px;cursor:pointer}
+.session-date-inp:focus{border-bottom:1px solid var(--gold)}
+.session-pills{display:flex;gap:5px;flex-wrap:wrap}
+.att-pill{display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 6px;border-radius:20px}
+.pill-p{background:var(--sage-lt);color:var(--sage)}
+.pill-t{background:var(--gold-lt);color:var(--gold)}
+.pill-a{background:var(--rose-lt);color:var(--rose)}
+
+/* Cuerpo de sesión */
+.session-body{display:none;border-top:1px solid var(--mist)}
+.session-block.open .session-body{display:block}
+
+/* Info extra de la sesión */
+.session-meta-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 14px;background:var(--cream);border-bottom:1px solid var(--mist)}
+.session-meta-row.three{grid-template-columns:1fr 1fr 1fr}
+.smeta-field{display:flex;flex-direction:column;gap:3px}
+.smeta-field label{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:#aaa}
+.smeta-field input,.smeta-field textarea{font-family:var(--sans);font-size:12px;border:1.5px solid var(--line);border-radius:4px;padding:5px 7px;background:var(--white);color:var(--ink);outline:none;width:100%}
+.smeta-field input:focus,.smeta-field textarea:focus{border-color:var(--rose)}
+.smeta-field textarea{resize:vertical;min-height:44px;font-size:11px}
+.smeta-obs{grid-column:1/-1}
+
+/* Alumnas dentro de sesión */
+.session-stu-list{display:flex;flex-direction:column}
+.session-stu-block{border-bottom:1px solid var(--mist)}
+.session-stu-block:last-child{border-bottom:none}
+.session-stu-hd{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--mist)}
+.session-stu-name{font-size:12px;font-weight:600;flex:1}
+.att-toggle{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:11px;font-weight:600;user-select:none;transition:background .1s;flex-shrink:0}
+.att-toggle[data-state="none"]{background:var(--line);color:#999}
+.att-toggle[data-state="present"]{background:var(--sage-lt);color:var(--sage)}
+.att-toggle[data-state="late"]{background:var(--gold-lt);color:var(--gold)}
+.att-toggle[data-state="absent"]{background:var(--rose-lt);color:var(--rose)}
+
+/* Tareas de una alumna en una sesión */
+.stu-tasks-area{padding:8px 14px 10px}
+.task-row{display:flex;align-items:center;gap:7px;margin-bottom:6px;flex-wrap:wrap}
+.task-code-inp{font-family:var(--mono);font-size:11px;font-weight:500;background:var(--ink);color:var(--cream);border:none;outline:none;width:38px;text-align:center;padding:3px 4px;border-radius:3px;text-transform:uppercase}
+.task-code-inp:focus{background:#333}
+.task-name-inp{font-family:var(--sans);font-size:11px;color:#888;border:none;border-bottom:1px solid transparent;background:transparent;outline:none;flex:1;min-width:80px}
+.task-name-inp:focus{border-bottom-color:var(--line)}
+.task-score-inp{font-family:var(--mono);font-size:16px;width:42px;border:none;border-bottom:1.5px solid var(--line);background:transparent;color:var(--ink);outline:none;text-align:center;padding:1px 2px}
+.task-score-inp:focus{border-bottom-color:var(--rose)}
+.task-score-inp::placeholder{color:#ddd;font-size:12px}
+.task-max-lbl{font-size:10px;color:#bbb}
+.task-obs-inp{font-family:var(--sans);font-size:10px;color:#999;border:none;border-bottom:1px solid transparent;background:transparent;outline:none;width:100%;margin-top:1px}
+.task-obs-inp:focus{border-bottom-color:var(--line)}
+.task-obs-inp::placeholder{color:#ddd}
+.add-task-btn{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#bbb;background:none;border:1px dashed var(--line);border-radius:4px;padding:3px 9px;cursor:pointer;transition:color .15s,border-color .15s}
+.add-task-btn:hover{color:var(--rose);border-color:var(--rose)}
+
+/* Add session */
+.add-session-btn{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:var(--white);border:1.5px dashed var(--line);border-radius:var(--r);color:#bbb;font-family:var(--sans);font-size:13px;cursor:pointer;transition:border-color .15s,color .15s;margin-bottom:24px}
+.add-session-btn:hover{border-color:var(--gold);color:var(--gold)}
+
+/* Legend */
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:#888;margin-bottom:14px}
+.legend span{display:flex;align-items:center;gap:4px}
+.dot{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:9px;font-weight:600}
+
+/* Config notice */
+.config-notice{background:var(--gold-lt);border:1.5px solid var(--gold);border-radius:var(--r);padding:12px 16px;margin-bottom:16px;font-size:12px;line-height:1.6}
+.config-notice strong{color:var(--gold);display:block;margin-bottom:2px}
+.config-notice code{font-family:var(--mono);font-size:10px;background:rgba(0,0,0,.07);padding:1px 4px;border-radius:3px}
+
+/* Toast */
+#toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:var(--cream);padding:9px 16px;border-radius:var(--r);font-size:12px;opacity:0;pointer-events:none;transition:opacity .3s;z-index:999}
+#toast.show{opacity:1}
+
+@media(max-width:600px){
+  .view{padding:14px}
+  header{padding:12px 14px}
+  .groups-grid{grid-template-columns:1fr}
+  .group-info-grid{grid-template-columns:1fr}
+  .session-meta-row,.session-meta-row.three{grid-template-columns:1fr}
+  .field-row{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="brand">Deja-vu Expressions</div>
+    <h1 id="header-title">Gradebook</h1>
+  </div>
+  <button class="back-btn" id="back-btn" onclick="showGroups()">← Grupos</button>
+</header>
+
+<!-- ══════════════════════════════════════
+     VISTA 1: Lista de Grupos
+══════════════════════════════════════ -->
+<div class="view active" id="view-groups">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <h2 style="font-size:18px;font-weight:600">Grupos activos</h2>
+      <p style="font-size:12px;color:#888;margin-top:2px">Toca un grupo para abrirlo</p>
+    </div>
+    <button class="btn btn-rose" onclick="openNewGroupModal()">＋ Nuevo grupo</button>
+  </div>
+  <div id="config-notice-wrap"></div>
+  <div id="groups-grid" class="groups-grid"></div>
+</div>
+
+<!-- ══════════════════════════════════════
+     VISTA 2: Gradebook del grupo
+══════════════════════════════════════ -->
+<div class="view" id="view-gradebook">
+
+  <!-- Info del grupo -->
+  <div class="group-info-panel" id="group-info-panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div class="section-title" style="margin-bottom:0;flex:1">Datos del grupo</div>
+      <button class="btn btn-gold btn-sm" onclick="saveCurrentGroup()">💾 Guardar</button>
+    </div>
+    <div class="group-info-grid" id="group-info-grid">
+      <!-- renderizado por JS -->
+    </div>
+  </div>
+
+  <!-- Alumnas (resumen con promedio) -->
+  <div class="section-title">Alumnas</div>
+  <div id="students-summary" class="students-summary"></div>
+  <button class="add-stu-btn" onclick="addStudent()">
+    <span style="font-size:16px">＋</span> Agregar alumna
+  </button>
+
+  <!-- Sesiones acordeón -->
+  <div class="section-title">Clases</div>
+  <div class="legend">
+    <span><span class="dot" style="background:var(--sage-lt);color:var(--sage)">✓</span> Presente</span>
+    <span><span class="dot" style="background:var(--gold-lt);color:var(--gold)">T</span> Tarde</span>
+    <span><span class="dot" style="background:var(--rose-lt);color:var(--rose)">✗</span> Ausente</span>
+    <span style="color:#ccc">· Toca el círculo para cambiar</span>
+  </div>
+  <div id="sessions-list" class="sessions-list"></div>
+  <button class="add-session-btn" onclick="addSession()">
+    <span style="font-size:16px">＋</span> Agregar clase
+  </button>
+
+</div>
+
+<!-- ══════════════════════════════════════
+     MODAL: Nuevo / Editar Grupo
+══════════════════════════════════════ -->
+<div class="modal-bg" id="modal-group">
+  <div class="modal">
+    <h2 id="modal-group-title">Nuevo Grupo</h2>
+    <div class="field">
+      <label>Nombre del grupo</label>
+      <input id="mg-name" type="text" placeholder="GEN#57 Make-up — Sáb 10am">
+    </div>
+    <div class="field">
+      <label>Tipo de curso</label>
+      <select id="mg-type">
+        <option value="makeup">💄 Maquillaje</option>
+        <option value="hair">💇 Peinado</option>
+        <option value="other">📋 Otro</option>
+      </select>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Día de la semana</label>
+        <select id="mg-day">
+          <option value="">— Selecciona —</option>
+          <option>Lunes</option><option>Martes</option><option>Miércoles</option>
+          <option>Jueves</option><option>Viernes</option><option>Sábado</option><option>Domingo</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Horario</label>
+        <input id="mg-horario" type="text" placeholder="10:00 am – 2:00 pm">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Fecha de inicio</label>
+        <input id="mg-start" type="date">
+      </div>
+      <div class="field">
+        <label>Fecha de término</label>
+        <input id="mg-end" type="date">
+      </div>
+    </div>
+    <div class="field">
+      <label>Profesor(a) titular</label>
+      <input id="mg-prof" type="text" placeholder="Miguel Arroyo">
+    </div>
+    <div class="field">
+      <label>Observaciones del grupo</label>
+      <textarea id="mg-obs" placeholder="Notas generales del grupo…"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-mist" onclick="closeModal('modal-group')">Cancelar</button>
+      <button class="btn btn-rose" onclick="saveGroup()">Guardar grupo</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// FIREBASE CONFIG
+// ══════════════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyB0Z2oFb5iWS85UCOqR-0IpmFsiDN3VetQ",
+  authDomain: "cursos-de-maquillaje-y-peinado.firebaseapp.com",
+  databaseURL: "https://cursos-de-maquillaje-y-peinado-default-rtdb.firebaseio.com",
+  projectId: "cursos-de-maquillaje-y-peinado",
+  storageBucket: "cursos-de-maquillaje-y-peinado.firebasestorage.app",
+  messagingSenderId: "245316999896",
+  appId: "1:245316999896:web:00abdc06e7ff6e2667d5ad"
+};
+
+const FB_CONFIGURED = !firebaseConfig.apiKey.startsWith('TU_');
+let db = null;
+if (FB_CONFIGURED) {
+  try { firebase.initializeApp(firebaseConfig); db = firebase.database(); }
+  catch(e){ console.warn('Firebase error:',e); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// ESTADO GLOBAL
+// ══════════════════════════════════════════════════════════════
+let groups    = {};
+let currentId = null;
+let editingGroupId = null;
+
+// Códigos de tarea sugeridos (solo para el picker)
+const TASK_CODES = ['M','A','B','N','E'];
+
+function uid(){ return Date.now()+'-'+Math.random().toString(36).slice(2,7); }
+
+function newGroup(name,type,day,horario,start,end,prof,obs){
+  return { name,type,day,horario,start,end,prof,obs,
+           students:[], sessions:[] };
+}
+
+function newStudent(name=''){
+  return { id:uid(), name, obs:'' };
+}
+
+// Una sesión: { id, name, date, tema, profSesion, obs, attendance:{stuId:state}, tasks:{stuId:[{id,code,name,score,obs}]} }
+function newSession(n){
+  return { id:uid(), name:`Clase ${n}`, date:'', tema:'', profSesion:'', obs:'',
+           attendance:{}, tasks:{} };
+}
+
+function newTask(){
+  return { id:uid(), code:'', name:'', score:'', obs:'' };
+}
+
+// ══════════════════════════════════════════════════════════════
+// DB ABSTRACTION
+// ══════════════════════════════════════════════════════════════
+function loadAllGroups(cb){
+  if(FB_CONFIGURED&&db){
+    db.ref('groups').once('value',snap=>{ groups=snap.val()||{}; cb(); });
+  } else {
+    try{ groups=JSON.parse(localStorage.getItem('dvu-groups')||'{}'); }catch(e){ groups={}; }
+    cb();
+  }
+}
+function saveGroupToDB(id,data,cb){
+  if(FB_CONFIGURED&&db){
+    db.ref('groups/'+id).set(data,()=>{ if(cb)cb(); });
+  } else {
+    groups[id]=data;
+    localStorage.setItem('dvu-groups',JSON.stringify(groups));
+    if(cb)cb();
+  }
+}
+function deleteGroupFromDB(id,cb){
+  if(FB_CONFIGURED&&db){
+    db.ref('groups/'+id).remove(()=>{ if(cb)cb(); });
+  } else {
+    delete groups[id];
+    localStorage.setItem('dvu-groups',JSON.stringify(groups));
+    if(cb)cb();
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// VISTA: GRUPOS
+// ══════════════════════════════════════════════════════════════
+function showGroups(){
+  currentId=null;
+  document.getElementById('view-groups').classList.add('active');
+  document.getElementById('view-gradebook').classList.remove('active');
+  document.getElementById('back-btn').classList.remove('visible');
+  document.getElementById('header-title').textContent='Gradebook';
+  if(!FB_CONFIGURED){
+    const w=document.getElementById('config-notice-wrap');
+    if(w)w.innerHTML=`<div class="config-notice" style="margin-top:16px">
+      <strong>⚙️ Modo local</strong>
+      Los datos se guardan en este dispositivo. Para sincronizar, configura Firebase en el archivo.
+    </div>`;
+  }
+  loadAllGroups(renderGroups);
+}
+
+function renderGroups(){
+  const grid=document.getElementById('groups-grid');
+  const ids=Object.keys(groups);
+  if(!ids.length){
+    grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1">
+      <span style="font-size:40px">📋</span>
+      <p>No hay grupos todavía.<br>Crea el primero con el botón <strong>+ Nuevo grupo</strong>.</p>
+    </div>`;
+    return;
+  }
+  grid.innerHTML=ids.map(id=>{
+    const g=groups[id];
+    const badge=g.type==='makeup'?'badge-makeup':g.type==='hair'?'badge-hair':'badge-other';
+    const icon =g.type==='makeup'?'💄':g.type==='hair'?'💇':'📋';
+    const label=g.type==='makeup'?'Maquillaje':g.type==='hair'?'Peinado':'Otro';
+    const nStu=(g.students||[]).length;
+    const nSes=(g.sessions||[]).length;
+    const dayStr=g.day?` · ${g.day}`:'';
+    const horStr=g.horario?` · ${g.horario}`:'';
+    return `<div class="group-card" onclick="openGroup('${id}')">
+      <button class="card-del" onclick="event.stopPropagation();deleteGroup('${id}')" title="Eliminar grupo">✕</button>
+      <div class="group-type-badge ${badge}">${icon} ${label}</div>
+      <h3>${esc(g.name)}</h3>
+      <div class="group-meta">
+        ${g.prof?`<span>👤 ${esc(g.prof)}</span>`:''}
+        ${(g.day||g.horario)?`<span>🕐 ${esc(g.day||'')}${horStr}</span>`:''}
+        ${g.start?`<span>📅 ${fmtDate(g.start)}${g.end?' → '+fmtDate(g.end):''}</span>`:''}
+      </div>
+      <div class="group-stats">
+        <div class="stat"><strong>${nStu}</strong> alumnas</div>
+        <div class="stat"><strong>${nSes}</strong> clases</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function fmtDate(d){
+  if(!d)return'';
+  const [y,m,day]=d.split('-');
+  return `${day}/${m}/${y}`;
+}
+
+function deleteGroup(id){
+  if(!confirm(`¿Eliminar el grupo "${groups[id]?.name}"? Esta acción no se puede deshacer.`))return;
+  deleteGroupFromDB(id,renderGroups);
+  toast('Grupo eliminado');
+}
+
+// ══════════════════════════════════════════════════════════════
+// MODAL: NUEVO / EDITAR GRUPO
+// ══════════════════════════════════════════════════════════════
+function openNewGroupModal(){
+  editingGroupId=null;
+  document.getElementById('modal-group-title').textContent='Nuevo Grupo';
+  ['mg-name','mg-horario','mg-prof','mg-obs'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('mg-type').value='makeup';
+  document.getElementById('mg-day').value='';
+  document.getElementById('mg-start').value='';
+  document.getElementById('mg-end').value='';
+  openModal('modal-group');
+}
+
+function openEditGroupModal(){
+  if(!currentId)return;
+  const g=groups[currentId];
+  editingGroupId=currentId;
+  document.getElementById('modal-group-title').textContent='Editar Grupo';
+  document.getElementById('mg-name').value   =g.name||'';
+  document.getElementById('mg-type').value   =g.type||'makeup';
+  document.getElementById('mg-day').value    =g.day||'';
+  document.getElementById('mg-horario').value=g.horario||'';
+  document.getElementById('mg-start').value  =g.start||'';
+  document.getElementById('mg-end').value    =g.end||'';
+  document.getElementById('mg-prof').value   =g.prof||'';
+  document.getElementById('mg-obs').value    =g.obs||'';
+  openModal('modal-group');
+}
+
+function saveGroup(){
+  const name   =document.getElementById('mg-name').value.trim();
+  if(!name){alert('Escribe un nombre para el grupo');return;}
+  const payload={
+    name,
+    type    :document.getElementById('mg-type').value,
+    day     :document.getElementById('mg-day').value,
+    horario :document.getElementById('mg-horario').value.trim(),
+    start   :document.getElementById('mg-start').value,
+    end     :document.getElementById('mg-end').value,
+    prof    :document.getElementById('mg-prof').value.trim(),
+    obs     :document.getElementById('mg-obs').value.trim(),
+  };
+  if(editingGroupId){
+    Object.assign(groups[editingGroupId],payload);
+    saveGroupToDB(editingGroupId,groups[editingGroupId],()=>{
+      closeModal('modal-group');
+      renderGroupInfo();
+      toast('Grupo actualizado ✓');
+    });
+  } else {
+    const id='g'+Date.now();
+    groups[id]={...payload, students:[], sessions:[]};
+    saveGroupToDB(id,groups[id],()=>{
+      closeModal('modal-group');
+      renderGroups();
+      toast('Grupo creado ✓');
+    });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// VISTA: GRADEBOOK
+// ══════════════════════════════════════════════════════════════
+function openGroup(id){
+  currentId=id;
+  document.getElementById('view-groups').classList.remove('active');
+  document.getElementById('view-gradebook').classList.add('active');
+  document.getElementById('back-btn').classList.add('visible');
+  document.getElementById('header-title').textContent=groups[id].name;
+  renderGroupInfo();
+  renderStudentsSummary();
+  renderSessions();
+}
+
+// ── Info panel del grupo (editable inline) ──────────────────
+function renderGroupInfo(){
+  const g=groups[currentId];
+  document.getElementById('group-info-grid').innerHTML=`
+    <div class="info-field">
+      <label>Nombre del grupo</label>
+      <input type="text" value="${esc(g.name||'')}" oninput="updateGroupField('name',this.value)" placeholder="GEN#57 Make-up">
+    </div>
+    <div class="info-field">
+      <label>Tipo de curso</label>
+      <select onchange="updateGroupField('type',this.value)">
+        <option value="makeup" ${g.type==='makeup'?'selected':''}>💄 Maquillaje</option>
+        <option value="hair"   ${g.type==='hair'?'selected':''}>💇 Peinado</option>
+        <option value="other"  ${g.type==='other'?'selected':''}>📋 Otro</option>
+      </select>
+    </div>
+    <div class="info-field">
+      <label>Día de la semana</label>
+      <select onchange="updateGroupField('day',this.value)">
+        <option value="" ${!g.day?'selected':''}>— —</option>
+        ${['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'].map(d=>`<option ${g.day===d?'selected':''}>${d}</option>`).join('')}
+      </select>
+    </div>
+    <div class="info-field">
+      <label>Horario</label>
+      <input type="text" value="${esc(g.horario||'')}" oninput="updateGroupField('horario',this.value)" placeholder="10:00 am – 2:00 pm">
+    </div>
+    <div class="info-field">
+      <label>Fecha de inicio</label>
+      <input type="date" value="${esc(g.start||'')}" onchange="updateGroupField('start',this.value)">
+    </div>
+    <div class="info-field">
+      <label>Fecha de término</label>
+      <input type="date" value="${esc(g.end||'')}" onchange="updateGroupField('end',this.value)">
+    </div>
+    <div class="info-field">
+      <label>Profesor(a) titular</label>
+      <input type="text" value="${esc(g.prof||'')}" oninput="updateGroupField('prof',this.value)" placeholder="Miguel Arroyo">
+    </div>
+    <div class="info-field info-obs">
+      <label>Observaciones del grupo</label>
+      <textarea oninput="updateGroupField('obs',this.value)" placeholder="Notas generales…">${esc(g.obs||'')}</textarea>
+    </div>
+  `;
+}
+
+function updateGroupField(field,val){
+  groups[currentId][field]=val;
+  autoSave();
+}
+
+// ── Alumnas (resumen) ────────────────────────────────────────
+function renderStudentsSummary(){
+  const g=groups[currentId];
+  const stu=g.students||[];
+  const el=document.getElementById('students-summary');
+  if(!stu.length){
+    el.innerHTML=`<div style="padding:14px;text-align:center;color:#bbb;font-size:12px">Agrega alumnas con el botón de abajo</div>`;
+    return;
+  }
+  el.innerHTML=stu.map((st,si)=>{
+    const avg=calcGlobalAvg(st.id);
+    return `<div class="stu-summary-row">
+      <span class="stu-num">${si+1}</span>
+      <input class="stu-name-inp" value="${esc(st.name)}" placeholder="Nombre de la alumna"
+        oninput="updateStudentName(${si},this.value)">
+      <span class="stu-avg-chip" id="gavg-${st.id}">${avg!==null?avg.toFixed(1):'—'}</span>
+      <button class="icon-btn" onclick="deleteStudent(${si})" title="Eliminar alumna">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function calcGlobalAvg(stuId){
+  const ses=groups[currentId].sessions||[];
+  const scores=[];
+  ses.forEach(s=>{
+    const tasks=(s.tasks||{})[stuId]||[];
+    tasks.forEach(t=>{
+      const v=parseInt(t.score,10);
+      if(!isNaN(v))scores.push(v);
+    });
+  });
+  if(!scores.length)return null;
+  return scores.reduce((a,b)=>a+b,0)/scores.length;
+}
+
+function refreshAvg(stuId){
+  const el=document.getElementById('gavg-'+stuId);
+  if(!el)return;
+  const avg=calcGlobalAvg(stuId);
+  el.textContent=avg!==null?avg.toFixed(1):'—';
+}
+
+function addStudent(){
+  if(!groups[currentId].students)groups[currentId].students=[];
+  groups[currentId].students.push(newStudent());
+  renderStudentsSummary();
+  renderSessions(); // actualizar nombres en sesiones
+  autoSave();
+  setTimeout(()=>{
+    const rows=document.querySelectorAll('.stu-name-inp');
+    if(rows.length)rows[rows.length-1].focus();
+  },50);
+}
+
+function deleteStudent(si){
+  const name=groups[currentId].students[si]?.name||'esta alumna';
+  if(!confirm(`¿Eliminar a "${name}"? Se eliminarán también sus calificaciones.`))return;
+  groups[currentId].students.splice(si,1);
+  renderStudentsSummary();
+  renderSessions();
+  autoSave();
+}
+
+function updateStudentName(si,val){
+  groups[currentId].students[si].name=val;
+  // actualizar nombres en las sesiones abiertas sin re-render completo
+  const stuId=groups[currentId].students[si].id;
+  document.querySelectorAll(`.session-stu-name[data-stuid="${stuId}"]`).forEach(el=>{
+    el.textContent=val||'Sin nombre';
+  });
+  autoSave();
+}
+
+// ── Sesiones ─────────────────────────────────────────────────
+function renderSessions(){
+  const g=groups[currentId];
+  const ses=g.sessions||[];
+  const el=document.getElementById('sessions-list');
+  el.innerHTML=ses.map((s,si)=>renderSessionBlock(s,si)).join('');
+}
+
+function renderSessionBlock(s,si){
+  const g=groups[currentId];
+  const stu=g.students||[];
+
+  // Pills resumen de asistencia
+  let nP=0,nT=0,nA=0;
+  stu.forEach(st=>{ const v=(s.attendance||{})[st.id]||'none';if(v==='present')nP++;else if(v==='late')nT++;else if(v==='absent')nA++; });
+  const pills=[
+    nP?`<span class="att-pill pill-p">✓ ${nP}</span>`:'',
+    nT?`<span class="att-pill pill-t">T ${nT}</span>`:'',
+    nA?`<span class="att-pill pill-a">✗ ${nA}</span>`:'',
+  ].join('');
+
+  const stuRows=stu.map(st=>renderStuInSession(s,st)).join('');
+
+  return `<div class="session-block" id="sb-${s.id}">
+    <div class="session-hd" onclick="toggleSession('${s.id}')">
+      <span class="session-toggle">▶</span>
+      <div class="session-hd-main">
+        <span class="session-num">${si+1}</span>
+        <input class="session-name-inp" value="${esc(s.name)}" placeholder="Clase ${si+1}"
+          onclick="event.stopPropagation()"
+          oninput="updateSession('${s.id}','name',this.value)">
+        <input class="session-date-inp" type="date" value="${esc(s.date||'')}"
+          onclick="event.stopPropagation()"
+          onchange="updateSession('${s.id}','date',this.value)"
+          title="Fecha de la clase">
+        <div class="session-pills">${pills||'<span style="font-size:10px;color:#ccc">Sin asistencia</span>'}</div>
+      </div>
+      <button class="icon-btn" onclick="event.stopPropagation();deleteSession('${s.id}')" title="Eliminar clase">✕</button>
+    </div>
+    <div class="session-body">
+      <!-- Meta de la sesión -->
+      <div class="session-meta-row three">
+        <div class="smeta-field">
+          <label>Tema de la clase</label>
+          <input type="text" value="${esc(s.tema||'')}" placeholder="Ej. Técnica de base"
+            oninput="updateSession('${s.id}','tema',this.value)">
+        </div>
+        <div class="smeta-field">
+          <label>Profesor(a) de esta clase</label>
+          <input type="text" value="${esc(s.profSesion||'')}" placeholder="Titular / Suplente"
+            oninput="updateSession('${s.id}','profSesion',this.value)">
+        </div>
+        <div class="smeta-field smeta-obs">
+          <label>Observaciones de la clase</label>
+          <textarea placeholder="Notas generales de esta sesión…"
+            oninput="updateSession('${s.id}','obs',this.value)">${esc(s.obs||'')}</textarea>
+        </div>
+      </div>
+      <!-- Alumnas en la sesión -->
+      <div class="session-stu-list">${stuRows||`<div style="padding:14px;text-align:center;color:#bbb;font-size:12px">Agrega alumnas arriba para verlas aquí</div>`}</div>
+    </div>
+  </div>`;
+}
+
+function renderStuInSession(s,st){
+  const state=(s.attendance||{})[st.id]||'none';
+  const icon=attIcon(state);
+  const tasks=(s.tasks||{})[st.id]||[];
+
+  const taskRows=tasks.map((t,ti)=>`
+    <div class="task-row" id="tr-${t.id}">
+      <input class="task-code-inp" value="${esc(t.code)}" placeholder="M"
+        maxlength="4"
+        oninput="updateTaskField('${s.id}','${st.id}',${ti},'code',this.value)"
+        title="Código de tarea (M, A, B, N, E…)">
+      <input class="task-name-inp" value="${esc(t.name)}" placeholder="nombre (opcional)"
+        oninput="updateTaskField('${s.id}','${st.id}',${ti},'name',this.value)">
+      <input class="task-score-inp" type="number" min="0" max="10" step="1"
+        value="${esc(t.score)}" placeholder="—"
+        oninput="updateTaskField('${s.id}','${st.id}',${ti},'score',this.value)">
+      <span class="task-max-lbl">/10</span>
+      <button class="icon-btn" style="font-size:12px" onclick="removeTask('${s.id}','${st.id}',${ti})" title="Quitar tarea">✕</button>
+    </div>
+    <div style="padding:0 0 4px 46px">
+      <input class="task-obs-inp" value="${esc(t.obs||'')}" placeholder="Observación de esta tarea…"
+        oninput="updateTaskField('${s.id}','${st.id}',${ti},'obs',this.value)">
+    </div>
+  `).join('');
+
+  return `<div class="session-stu-block">
+    <div class="session-stu-hd">
+      <span class="att-toggle" data-state="${state}"
+        onclick="cycleAtt('${s.id}','${st.id}',this)">${icon}</span>
+      <span class="session-stu-name" data-stuid="${st.id}">${esc(st.name)||'Sin nombre'}</span>
+      <span class="stu-avg-chip" id="gavg-${st.id}" style="font-size:11px">${(()=>{const a=calcGlobalAvg(st.id);return a!==null?a.toFixed(1):'—';})()}</span>
+    </div>
+    <div class="stu-tasks-area" id="tasks-area-${s.id}-${st.id}">
+      ${taskRows}
+      <button class="add-task-btn" onclick="addTask('${s.id}','${st.id}')">＋ tarea</button>
+    </div>
+  </div>`;
+}
+
+function toggleSession(sid){
+  const el=document.getElementById('sb-'+sid);
+  el.classList.toggle('open');
+}
+
+function addSession(){
+  if(!groups[currentId].sessions)groups[currentId].sessions=[];
+  const n=groups[currentId].sessions.length+1;
+  groups[currentId].sessions.push(newSession(n));
+  renderSessions();
+  autoSave();
+  // abrir la última
+  const ses=groups[currentId].sessions;
+  setTimeout(()=>{ document.getElementById('sb-'+ses[ses.length-1].id)?.classList.add('open'); },30);
+}
+
+function deleteSession(sid){
+  if(!confirm('¿Eliminar esta clase? Se perderá la asistencia y tareas de todas las alumnas en ella.'))return;
+  groups[currentId].sessions=groups[currentId].sessions.filter(s=>s.id!==sid);
+  renderSessions();
+  autoSave();
+}
+
+function updateSession(sid,field,val){
+  const s=getSession(sid);
+  if(!s)return;
+  s[field]=val;
+  if(field==='name'||field==='date'){
+    // actualizar cabeza sin re-render completo
+  }
+  autoSave();
+}
+
+function getSession(sid){
+  return (groups[currentId].sessions||[]).find(s=>s.id===sid);
+}
+
+// ── Asistencia ───────────────────────────────────────────────
+function attIcon(state){
+  return state==='present'?'✓':state==='late'?'T':state==='absent'?'✗':'·';
+}
+
+function cycleAtt(sid,stuId,el){
+  const order=['none','present','late','absent'];
+  const s=getSession(sid);
+  if(!s)return;
+  if(!s.attendance)s.attendance={};
+  const cur=s.attendance[stuId]||'none';
+  const next=order[(order.indexOf(cur)+1)%order.length];
+  s.attendance[stuId]=next;
+  el.dataset.state=next;
+  el.textContent=attIcon(next);
+  // actualizar pills en la cabeza
+  refreshSessionPills(sid);
+  autoSave();
+}
+
+function refreshSessionPills(sid){
+  const s=getSession(sid);
+  if(!s)return;
+  const stu=groups[currentId].students||[];
+  let nP=0,nT=0,nA=0;
+  stu.forEach(st=>{ const v=(s.attendance||{})[st.id]||'none';if(v==='present')nP++;else if(v==='late')nT++;else if(v==='absent')nA++; });
+  const pills=[
+    nP?`<span class="att-pill pill-p">✓ ${nP}</span>`:'',
+    nT?`<span class="att-pill pill-t">T ${nT}</span>`:'',
+    nA?`<span class="att-pill pill-a">✗ ${nA}</span>`:'',
+  ].join('');
+  const el=document.querySelector(`#sb-${sid} .session-pills`);
+  if(el)el.innerHTML=pills||`<span style="font-size:10px;color:#ccc">Sin asistencia</span>`;
+}
+
+// ── Tareas ───────────────────────────────────────────────────
+function addTask(sid,stuId){
+  const s=getSession(sid);
+  if(!s)return;
+  if(!s.tasks)s.tasks={};
+  if(!s.tasks[stuId])s.tasks[stuId]=[];
+  s.tasks[stuId].push(newTask());
+  refreshTasksArea(sid,stuId);
+  autoSave();
+}
+
+function removeTask(sid,stuId,ti){
+  const s=getSession(sid);
+  if(!s)return;
+  s.tasks[stuId].splice(ti,1);
+  refreshTasksArea(sid,stuId);
+  refreshAvg(stuId);
+  autoSave();
+}
+
+function updateTaskField(sid,stuId,ti,field,val){
+  const s=getSession(sid);
+  if(!s||!s.tasks[stuId])return;
+  const task=s.tasks[stuId][ti];
+  if(!task)return;
+  if(field==='score'){
+    const v=val===''?'':String(Math.round(Number(val)));
+    task.score=v;
+  } else {
+    task[field]=val;
+  }
+  refreshAvg(stuId);
+  autoSave();
+}
+
+function refreshTasksArea(sid,stuId){
+  const el=document.getElementById(`tasks-area-${sid}-${stuId}`);
+  if(!el)return;
+  const s=getSession(sid);
+  const tasks=(s.tasks||{})[stuId]||[];
+  const taskRows=tasks.map((t,ti)=>`
+    <div class="task-row">
+      <input class="task-code-inp" value="${esc(t.code)}" placeholder="M"
+        maxlength="4"
+        oninput="updateTaskField('${sid}','${stuId}',${ti},'code',this.value)">
+      <input class="task-name-inp" value="${esc(t.name)}" placeholder="nombre (opcional)"
+        oninput="updateTaskField('${sid}','${stuId}',${ti},'name',this.value)">
+      <input class="task-score-inp" type="number" min="0" max="10" step="1"
+        value="${esc(t.score)}" placeholder="—"
+        oninput="updateTaskField('${sid}','${stuId}',${ti},'score',this.value)">
+      <span class="task-max-lbl">/10</span>
+      <button class="icon-btn" style="font-size:12px" onclick="removeTask('${sid}','${stuId}',${ti})" title="Quitar tarea">✕</button>
+    </div>
+    <div style="padding:0 0 4px 46px">
+      <input class="task-obs-inp" value="${esc(t.obs||'')}" placeholder="Observación de esta tarea…"
+        oninput="updateTaskField('${sid}','${stuId}',${ti},'obs',this.value)">
+    </div>
+  `).join('');
+  el.innerHTML=taskRows+`<button class="add-task-btn" onclick="addTask('${sid}','${stuId}')">＋ tarea</button>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// GUARDAR
+// ══════════════════════════════════════════════════════════════
+let saveTimer;
+function autoSave(){ clearTimeout(saveTimer); saveTimer=setTimeout(saveCurrentGroup,1200); }
+function saveCurrentGroup(){
+  if(!currentId)return;
+  saveGroupToDB(currentId,groups[currentId],()=>toast('Guardado ✓'));
+}
+
+// ══════════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════════
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m)m.classList.remove('open'); }));
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),2000);
+}
+
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+loadAllGroups(renderGroups);
+</script>
+</body>
+</html>
