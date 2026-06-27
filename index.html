@@ -275,12 +275,14 @@ const firebaseConfig = {
 };
 
 // ── Detectar si Firebase está configurado ──
-const FB_CONFIGURED = !FIREBASE_CONFIG.apiKey.startsWith('TU_');
+// CORRECCIÓN: Se cambió FIREBASE_CONFIG por firebaseConfig
+const FB_CONFIGURED = !firebaseConfig.apiKey.startsWith('TU_');
 
 let db = null;
 if (FB_CONFIGURED) {
   try {
-    firebase.initializeApp(FIREBASE_CONFIG);
+    // CORRECCIÓN: Se cambió FIREBASE_CONFIG por firebaseConfig
+    firebase.initializeApp(firebaseConfig);
     db = firebase.database();
   } catch(e) { console.warn('Firebase error:', e); }
 }
@@ -333,7 +335,7 @@ function newStudent(name='') {
 // FIREBASE ↔ LOCALSTORAGE ABSTRACTION
 // ══════════════════════════════════════════════════════════════
 function loadAllGroups(cb) {
-  if (FB_CONFIGURED) {
+  if (FB_CONFIGURED && db) {
     db.ref('groups').once('value', snap => {
       groups = snap.val() || {};
       cb();
@@ -345,7 +347,7 @@ function loadAllGroups(cb) {
 }
 
 function saveGroupToDB(id, data, cb) {
-  if (FB_CONFIGURED) {
+  if (FB_CONFIGURED && db) {
     db.ref('groups/' + id).set(data, () => { if(cb) cb(); });
   } else {
     groups[id] = data;
@@ -355,7 +357,7 @@ function saveGroupToDB(id, data, cb) {
 }
 
 function deleteGroupFromDB(id, cb) {
-  if (FB_CONFIGURED) {
+  if (FB_CONFIGURED && db) {
     db.ref('groups/' + id).remove(() => { if(cb) cb(); });
   } else {
     delete groups[id];
